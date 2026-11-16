@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>오늘의 집밥</title>
+<meta name="description" content="냉장고에 있는 재료로 오늘 뭐 해 먹을지 골라 주는 집밥 추천">
+<meta name="theme-color" content="#2f7a4b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="tabs" aria-label="화면 이동"><div class="in" role="tablist">
+  <button type="button" role="tab" id="tab-fridge" data-v="fridge"><svg viewBox="0 0 24 24"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M5 9.5h14M8.5 5.5v2M8.5 12.5v3"/></svg>냉장고</button>
+  <button type="button" role="tab" id="tab-rec" data-v="rec"><svg viewBox="0 0 24 24"><path d="M4 11h16a8 8 0 0 1-16 0zM9 7c0-1.5 1-1.5 1-3M13 7c0-1.5 1-1.5 1-3"/></svg>추천 메뉴<span class="badge" id="recBadge" hidden></span></button>
+  <button type="button" role="tab" id="tab-shop" data-v="shop"><svg viewBox="0 0 24 24"><path d="M3 4h2.5l2 11h11l2-8H7"/><circle cx="9" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></svg>장보기<span class="badge" id="shopBadge" hidden></span></button>
+</div></nav>
+
+<div class="wrap">
+  <header>
+    <h1>오늘의 집밥<span class="dot">.</span></h1>
+    <p class="sub">냉장고에 있는 재료로 오늘 뭐 해 먹을지 골라 드려요.</p>
+  </header>
+
+  <div class="alert" id="expAlert" hidden></div>
+
+  <!-- 냉장고 -->
+  <section class="view" id="v-fridge" role="tabpanel" aria-labelledby="tab-fridge">
+    <div class="note" id="exampleNote" hidden><span>예시 재료가 들어 있어요. 우리 집 냉장고에 맞게 바꿔 주세요.</span><button type="button" class="link" id="clearExample">예시 지우기</button></div>
+    <div class="panel">
+      <div class="head"><h2>우리 집 냉장고</h2><button type="button" class="link" id="clearIng">모두 비우기</button></div>
+      <p class="hint">유통기한을 넣어 두면 곧 상하는 재료를 먼저 쓰는 메뉴를 추천해요.</p>
+      <ul class="fridge" id="fridgeList"></ul>
+      <form class="row" id="addForm" autocomplete="off">
+        <input type="text" id="ingInput" placeholder="재료 직접 입력 (쉼표로 여러 개)" aria-label="재료 직접 입력">
+        <button type="submit" class="btn">추가</button>
+      </form>
+      <div id="photoWrap" hidden>
+        <label class="btn ghost wide" for="photoInput" style="display:block;text-align:center">사진 찍어서 재료 추가</label>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+      </div>
+      <div class="photo-res" id="photoRes" hidden></div>
+    </div>
+    <div class="panel">
+      <h3>버튼으로 재료 고르기</h3>
+      <div id="cats" class="view" style="gap:12px"></div>
+    </div>
+    <div class="panel">
+      <div class="head"><h3>집에 있는 양념</h3><button type="button" class="link" id="allSeas">기본 양념 다 있어요</button></div>
+      <div class="chips" id="seas"></div>
+    </div>
+    <div class="panel">
+      <h3>못 먹는 재료 · 알레르기</h3>
+      <div class="chips" id="dislikeChips"></div>
+      <input type="text" id="dislikeInput" placeholder="쉼표로 구분 (예: 고수, 땅콩)" aria-label="못 먹는 재료 직접 입력">
+    </div>
+    <button type="button" class="btn wide" id="goRec">추천 메뉴 보기</button>
+  </section>
+
+  <!-- 추천 -->
+  <section class="view" id="v-rec" role="tabpanel" aria-labelledby="tab-rec" hidden>
+    <details class="cond" id="cond">
+      <summary><span class="s" id="condSummary"></span><span class="open">조건</span></summary>
+      <div class="cond-body">
+        <div class="opts">
+          <div class="opt"><span class="lb">몇 인분</span>
+            <div class="servings"><button type="button" id="servMinus" aria-label="인분 줄이기">−</button><output id="serv">2인분</output><button type="button" id="servPlus" aria-label="인분 늘리기">+</button></div>
+          </div>
+          <div class="opt"><label for="time">요리 시간</label>
+            <select id="time"><option value="10">10분 이내</option><option value="20">20분 이내</option><option value="30">30분 이내</option><option value="60">1시간 이내</option><option value="999">상관없음</option></select>
+          </div>
+        </div>
+        <div class="opt"><span class="lb">요리 실력</span><div class="seg" id="skill"></div></div>
+        <div class="opt"><span class="lb">원하는 스타일 (안 고르면 전부)</span><div class="chips" id="styles"></div></div>
+        <div class="opt"><span class="lb">있는 조리도구</span><div class="chips" id="tools"></div></div>
+      </div>
+    </details>
+
+    <div class="sortbar">
+      <div class="seg" id="sort" aria-label="정렬"></div>
+      <button type="button" class="btn ghost sm" id="reroll">다른 메뉴 추천</button>
+    </div>
+
+    <div class="head"><h2>지금 바로 만들 수 있어요</h2><span class="hint" id="readyCount"></span></div>
+    <div class="cards" id="ready"></div>
+
+    <div class="head"><h2>1~2개만 더 사면 돼요</h2></div>
+    <p class="hint" style="margin-top:-10px">"장보기에 담기"를 누르면 없는 재료가 장보기 목록에 들어가요.</p>
+    <div class="cards" id="almost"></div>
+
+    <div class="ai" id="aiBox" hidden>
+      <h2>Claude에게 새 레시피 받기</h2>
+      <p>위 목록에 없는 메뉴가 궁금하면, 지금 재료와 조건으로 새 레시피 3개를 만들어 드려요.</p>
+      <button type="button" class="btn yolk" id="aiBtn">새 레시피 만들기</button>
+      <div class="status" id="aiStatus"></div>
+      <div class="cards" id="aiCards"></div>
+    </div>
+  </section>
+
+  <!-- 장보기 -->
+  <section class="view" id="v-shop" role="tabpanel" aria-labelledby="tab-shop" hidden>
+    <div class="panel">
+      <div class="head"><h2>장보기 목록</h2><button type="button" class="link" id="clearShop">목록 비우기</button></div>
+      <ul class="shop" id="shopList"></ul>
+      <form class="row" id="shopForm" autocomplete="off">
+        <input type="text" id="shopInput" placeholder="살 것 직접 추가" aria-label="장보기 항목 추가">
+        <button type="submit" class="btn">추가</button>
+      </form>
+      <button type="button" class="btn wide" id="moveBought">산 것 냉장고에 넣기</button>
+    </div>
+    <div class="panel">
+      <h2>사 두면 활용도 높은 재료</h2>
+      <p class="hint">지금 냉장고 재료에 이것 하나만 더하면 만들 수 있는 메뉴가 많은 순서예요.</p>
+      <ul class="buy" id="buyList"></ul>
+    </div>
+  </section>
+</div>
+
+<dialog id="dlg"><div class="dlg" id="dlgBody"></div></dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script src="js/data.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

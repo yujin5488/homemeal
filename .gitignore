@@ -1,0 +1,8 @@
+# 비밀값(API 키 등)은 절대 올리지 않기
+.env
+.env.*
+!.env.example
+
+node_modules/
+.vercel/
+.DS_Store
