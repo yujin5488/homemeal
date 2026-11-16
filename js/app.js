@@ -5,10 +5,11 @@ const SKEY="jipbap-v2";
 const DAY=86400000;
 const today0=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
 const isoIn=n=>{const d=new Date(today0().getTime()+n*DAY);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
-let S={have:["계란","김치","양파","대파","밥","두부","애호박"],exp:{"두부":isoIn(2),"애호박":isoIn(4)},example:true,
+let S={have:["계란","김치","양파","대파","밥","두부","애호박"],exp:{"두부":isoIn(2),"애호박":isoIn(4),"계란":isoIn(25)},
+  buy:{"계란":isoIn(-5)},mode:{"계란":"auto"},example:true,
   serv:2,time:30,skill:2,styles:[],tools:["가스레인지","전자레인지"],seas:[...BASIC],dislike:[],dislikeText:"",
   sort:"score",seed:1,shop:[],view:"fridge"};
-try{const v=JSON.parse(localStorage.getItem(SKEY)||"null");if(v)S=Object.assign(S,v)}catch(e){}
+try{const v=JSON.parse(localStorage.getItem(SKEY)||"null");if(v){if(!v.mode){v.buy={};v.mode={}}S=Object.assign(S,v)}}catch(e){}
 const save=()=>{try{localStorage.setItem(SKEY,JSON.stringify(S))}catch(e){}};
 
 const $=id=>document.getElementById(id);
@@ -29,8 +30,15 @@ const ddayText=n=>n<0?"지남":n===0?"오늘까지":"D-"+n;
 const soonList=()=>S.have.map(h=>[h,daysLeft(h)]).filter(([,d])=>d!=null&&d<=3).sort((a,b)=>a[1]-b[1]);
 const isSoon=n=>soonList().some(([h])=>same(h,n));
 
-function addHave(names){let added=0;for(const x of names){const n=x.trim();if(!n)continue;if(isSeas(n)&&!haveIt(n)){const s=SEAS.find(s=>same(s,n));if(!S.seas.includes(s))S.seas.push(s);added++;continue}if(!S.have.some(h=>norm(h)===norm(n))){S.have.push(n);added++}}S.example=false;return added}
-function removeHave(n){S.have=S.have.filter(x=>x!==n);delete S.exp[n];S.example=false}
+// 구입일로 소비기한 계산 (data.js 의 SHELF 표 사용)
+const shelfOf=n=>SHELF[n]||SHELF[Object.keys(SHELF).find(k=>same(k,n))]||null;
+const addDays=(iso,n)=>{const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()+n);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const md=iso=>{const[,m,d]=iso.split("-");return (+m)+"/"+(+d)};
+function setAuto(n,buyIso){const sh=shelfOf(n);if(!sh)return false;S.mode[n]="auto";S.buy[n]=buyIso||isoIn(0);S.exp[n]=addDays(S.buy[n],sh.d);return true}
+function setManual(n){S.mode[n]="manual";delete S.buy[n]}
+
+function addHave(names){let added=0;for(const x of names){const n=x.trim();if(!n)continue;if(isSeas(n)&&!haveIt(n)){const s=SEAS.find(s=>same(s,n));if(!S.seas.includes(s))S.seas.push(s);added++;continue}if(!S.have.some(h=>norm(h)===norm(n))){S.have.push(n);setAuto(n);added++}}S.example=false;return added}
+function removeHave(n){S.have=S.have.filter(x=>x!==n);delete S.exp[n];delete S.buy[n];delete S.mode[n];S.example=false}
 function addShop(names,why){let added=0;for(const n of names){if(!S.shop.some(s=>norm(s.n)===norm(n))){S.shop.push({n,done:false,why:why||""});added++}}return added}
 
 // 추천 계산
@@ -71,12 +79,20 @@ function renderFridge(){
   if(!S.have.length){L.replaceChildren(el("li",{class:"empty",style:"display:block"},"아직 재료가 없어요. 아래 버튼이나 사진으로 추가해 주세요."))}
   else{
     const items=[...S.have].sort((a,b)=>(daysLeft(a)??999)-(daysLeft(b)??999));
-    L.replaceChildren(...items.map(h=>{const d=daysLeft(h);
-      const inp=el("input",{type:"date",value:S.exp[h]||"","aria-label":h+" 유통기한"});
-      inp.onchange=()=>{if(inp.value)S.exp[h]=inp.value;else delete S.exp[h];update()};
-      return el("li",{},el("span",{class:"nm"},h),inp,
-        d==null?el("span",{class:"dday ok"},"기한 없음"):el("span",{class:"dday "+(d<=3?"soon":"ok")},ddayText(d)),
-        el("button",{type:"button",class:"x","aria-label":h+" 빼기",onclick:()=>{removeHave(h);update()}},"×"))}));
+    L.replaceChildren(...items.map(h=>{const d=daysLeft(h),sh=shelfOf(h),auto=S.mode[h]==="auto"&&!!sh;
+      const seg=el("div",{class:"seg mini",role:"group","aria-label":h+" 기한 넣는 방법"},
+        el("button",{type:"button","aria-pressed":String(!auto),onclick:()=>{if(auto){setManual(h);update()}}},"유통기한 직접"),
+        el("button",{type:"button","aria-pressed":String(auto),disabled:!sh,title:sh?null:"이 재료는 기준이 없어 직접 넣어 주세요",onclick:()=>{if(!auto){setAuto(h);update()}}},"구입일로 계산"));
+      const inp=el("input",{type:"date",value:(auto?S.buy[h]:S.exp[h])||"","aria-label":h+(auto?" 구입일":" 유통기한")});
+      inp.onchange=()=>{if(auto){if(inp.value)setAuto(h,inp.value);else{setManual(h);delete S.exp[h]}}else{if(inp.value)S.exp[h]=inp.value;else delete S.exp[h]}update()};
+      const info=auto?`구입일 기준 · 보통 ${sh.at} ${sh.d}일 → ${md(S.exp[h])}까지`+(sh.note?` (${sh.note})`:"")
+        :sh?"":"이 재료는 기준이 없어 직접 넣어 주세요";
+      return el("li",{},
+        el("div",{class:"top"},el("span",{class:"nm"},h),
+          d==null?el("span",{class:"dday ok"},"기한 없음"):el("span",{class:"dday "+(d<=3?"soon":"ok")},ddayText(d)),
+          el("button",{type:"button",class:"x","aria-label":h+" 빼기",onclick:()=>{removeHave(h);update()}},"×")),
+        el("div",{class:"exp-row"},seg,el("label",{class:"exp-in"},el("span",{},auto?"구입일":"유통기한"),inp)),
+        info?el("div",{class:"exp-info"},info):null)}));
   }
   $("cats").replaceChildren(...Object.entries(CATS).map(([c,items])=>{const row=el("div",{class:"chips"});chipRow(row,items,v=>S.have.includes(v),v=>{if(S.have.includes(v))removeHave(v);else addHave([v]);update()});return el("div",{class:"cat"},el("div",{class:"cat-name"},c),row)}));
   chipRow($("seas"),SEAS,v=>S.seas.includes(v),v=>{S.seas=toggle(S.seas,v);update()});
@@ -172,7 +188,7 @@ $("dislikeInput").oninput=e=>{S.dislikeText=e.target.value;save();renderRec();re
 $("reroll").onclick=()=>{S.seed=(S.seed%9973)+Math.floor(Math.random()*500)+1;S.sort="score";update();toast("새로 골라 봤어요")};
 $("shopForm").addEventListener("submit",e=>{e.preventDefault();addShop($("shopInput").value.split(/[,，]/).map(s=>s.trim()).filter(Boolean));$("shopInput").value="";update()});
 $("clearShop").onclick=()=>{S.shop=[];update()};
-$("moveBought").onclick=()=>{const bought=S.shop.filter(s=>s.done).map(s=>s.n);S.shop=S.shop.filter(s=>!s.done);addHave(bought);update();toast(`${bought.length}개를 냉장고에 넣었어요. 유통기한도 적어 두세요.`)};
+$("moveBought").onclick=()=>{const bought=S.shop.filter(s=>s.done).map(s=>s.n);S.shop=S.shop.filter(s=>!s.done);addHave(bought);update();toast(`${bought.length}개를 냉장고에 넣었어요. 오늘 산 걸로 소비기한을 계산해 뒀어요.`)};
 
 showView(TABS.includes(S.view)?S.view:"fridge");
 update();
